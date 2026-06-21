@@ -4,21 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Aesthetic Live Blur</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous" defer></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; }
-        canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-            object-fit: cover;
-            transform: scaleX(-1); /* Efek cermin */
-        }
+        canvas { display: block; width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
+        #status { position: absolute; top: 10px; color: #fff; z-index: 10; }
     </style>
 </head>
 <body>
-
+    <div id="status">Loading AI...</div>
     <video class="input_video" playsinline style="display:none;"></video>
     <canvas class="output_canvas"></canvas>
 
@@ -26,23 +20,45 @@
         const videoElement = document.querySelector('.input_video');
         const canvasElement = document.querySelector('.output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
+        const status = document.getElementById('status');
+
+        let hands;
+
+        async function init() {
+            // 1. Setup Hands
+            hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+            hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+            hands.onResults(onResults);
+
+            // 2. Setup Kamera
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            videoElement.srcObject = stream;
+            videoElement.play();
+
+            status.innerText = "Kamera Aktif";
+            
+            // 3. Loop AI
+            async function loop() {
+                if (videoElement.readyState >= 2) {
+                    await hands.send({image: videoElement});
+                }
+                requestAnimationFrame(loop);
+            }
+            loop();
+        }
 
         function onResults(results) {
+            status.style.display = "none";
             canvasElement.width = window.innerWidth;
             canvasElement.height = window.innerHeight;
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
-                const indexUp = landmarks[8].y < landmarks[6].y;
-                const middleUp = landmarks[12].y < landmarks[10].y;
-                const ringDown = landmarks[16].y > landmarks[14].y;
-                const pinkyDown = landmarks[20].y > landmarks[18].y;
-
-                if (indexUp && middleUp && ringDown && pinkyDown) {
-                    canvasCtx.globalAlpha = 0.3; 
+                if (landmarks[8].y < landmarks[6].y && landmarks[12].y < landmarks[10].y) {
+                    canvasCtx.globalAlpha = 0.3;
                     canvasCtx.drawImage(results.image, 15, 15, canvasElement.width, canvasElement.height);
                     canvasCtx.drawImage(results.image, -15, -15, canvasElement.width, canvasElement.height);
                     canvasCtx.globalAlpha = 1.0;
@@ -50,29 +66,8 @@
             }
         }
 
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
-        hands.onResults(onResults);
-
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                videoElement.srcObject = stream;
-                videoElement.onloadedmetadata = () => {
-                    videoElement.play();
-                    loop();
-                };
-            } catch (e) { alert("Error kamera: " + e.message); }
-        }
-
-        async function loop() {
-            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
-                await hands.send({image: videoElement});
-            }
-            requestAnimationFrame(loop);
-        }
-
-        startCamera();
+        // Tunggu semua script siap
+        window.onload = init;
     </script>
 </body>
 </html>
