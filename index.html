@@ -6,41 +6,45 @@
     <title>Aesthetic Cam</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
         
-        /* Video langsung diberi filter agar lebih pasti */
+        #container { position: relative; width: 100vw; height: 100vh; }
+        
         #video { 
-            width: 100vw; height: 100vh; object-fit: cover; 
-            transform: scaleX(-1); transition: filter 0.3s ease;
+            width: 100%; height: 100%; object-fit: cover; 
+            transform: scaleX(-1); position: absolute; top: 0; left: 0;
         }
         
-        .blur-mode { filter: blur(15px) brightness(1.2) contrast(1.5); }
+        /* Layer blur yang menumpuk di atas video */
+        #blur-layer {
+            position: absolute; width: 100%; height: 100%; z-index: 2;
+            backdrop-filter: blur(20px) brightness(1.1) saturate(1.5);
+            -webkit-backdrop-filter: blur(20px) brightness(1.1) saturate(1.5); /* Support Safari */
+            opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
+        }
         
+        .active { opacity: 1 !important; }
+        
+        /* UI Styling */
         #overlay { 
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-            background: rgba(0,0,0,0.8); z-index: 1000;
+            background: rgba(0,0,0,0.85); z-index: 1000;
             display: flex; justify-content: center; align-items: center; 
         }
-        .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; }
-        
-        /* Tombol Reset Transparan */
+        .btn { 
+            padding: 20px 40px; font-size: 20px; cursor: pointer; 
+            border-radius: 30px; border: none; background: white; font-weight: bold;
+        }
         #btn-reset { 
             position: fixed; bottom: 20px; right: 20px; z-index: 999; 
-            padding: 10px 20px; background: rgba(255,255,255,0.2); 
+            padding: 12px 24px; background: rgba(255,255,255,0.2); 
             color: white; border: 1px solid white; border-radius: 20px;
             backdrop-filter: blur(5px); cursor: pointer; display: none;
         }
-
-        #blur-layer { 
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        z-index: 500; pointer-events: none; /* Biar tetap bisa klik tombol */
-        opacity: 0; transition: opacity 0.3s;
-        }
-        .blur-on { opacity: 1 !important; }
     </style>
 </head>
 <body>
-    <canvas id="blur-layer"></canvas>
+
     <div id="overlay">
         <button id="btn-start" class="btn">MULAI ✨</button>
     </div>
@@ -48,48 +52,41 @@
     <button id="btn-reset">Reset Audio ↺</button>
     <audio id="audio" src="lagu.mp3" loop></audio>
     
-    <video id="video" playsinline></video>
+    <div id="container">
+        <video id="video" playsinline></video>
+        <div id="blur-layer"></div>
+    </div>
     
     <script>
         const video = document.getElementById('video');
         const audio = document.getElementById('audio');
         const overlay = document.getElementById('overlay');
         const resetBtn = document.getElementById('btn-reset');
+        const blurLayer = document.getElementById('blur-layer');
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
-        const blurLayer = document.getElementById('blur-layer');
-        const ctx = blurLayer.getContext('2d');
-
         hands.onResults((results) => {
-            // Ukuran canvas harus sesuai layar
-            blurLayer.width = window.innerWidth;
-            blurLayer.height = window.innerHeight;
-
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const l = results.multiHandLandmarks[0];
+                // Deteksi 2 jari (Index & Middle)
                 if (l[8].y < l[6].y && l[12].y < l[10].y) {
-                    blurLayer.classList.add('blur-on');
-                    
-                    // Gambar efek blur di canvas
-                    ctx.clearRect(0, 0, blurLayer.width, blurLayer.height);
-                    ctx.filter = 'blur(15px) brightness(1.2) contrast(1.5)';
-                    // Menggambar video ke canvas dengan filter
-                    ctx.drawImage(video, 0, 0, blurLayer.width, blurLayer.height);
+                    blurLayer.classList.add('active');
                 } else {
-                    blurLayer.classList.remove('blur-on');
+                    blurLayer.classList.remove('active');
                 }
             } else {
-                blurLayer.classList.remove('blur-on');
+                blurLayer.classList.remove('active');
             }
         });
+
         document.getElementById('btn-start').onclick = async () => {
             try {
                 overlay.remove();
                 resetBtn.style.display = 'block';
-                
                 audio.play();
+                
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 video.srcObject = stream;
                 video.play();
@@ -99,7 +96,7 @@
                     requestAnimationFrame(frame);
                 }
                 frame();
-            } catch (e) { alert("Izin kamera gagal!"); }
+            } catch (e) { alert("Izin kamera gagal! Pastikan akses kamera diizinkan."); }
         };
 
         resetBtn.onclick = () => { audio.currentTime = 0; audio.play(); };
