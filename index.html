@@ -3,58 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aesthetic Blur Debug</title>
+    <title>Aesthetic Cam with Music</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; }
-        #canvas-overlay { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; transform: scaleX(-1); }
+        body { margin: 0; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         video { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
         .blur { filter: blur(15px) brightness(1.2) contrast(1.5); }
+        
+        /* Gaya Tombol */
+        .btn { position: absolute; padding: 15px 30px; background: white; border-radius: 30px; border: none; font-weight: bold; cursor: pointer; z-index: 20; }
+        #btn-reset { bottom: 20px; right: 20px; background: rgba(255,255,255,0.3); color: white; }
     </style>
 </head>
 <body>
-    <video id="video" playsinline autoplay></video>
-    <canvas id="canvas-overlay"></canvas>
+
+    <button id="btn-start" class="btn">Mulai Kamera & Musik ✨</button>
+    <button id="btn-reset" class="btn" style="display:none;">Reset Lagu ↺</button>
+    
+    <audio id="myAudio" loop>
+        <source src="lagu.mp3" type="audio/mpeg">
+    </audio>
+
+    <video id="video" playsinline></video>
 
     <script>
         const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas-overlay');
-        const ctx = canvas.getContext('2d');
+        const audio = document.getElementById('myAudio');
+        const startBtn = document.getElementById('btn-start');
+        const resetBtn = document.getElementById('btn-reset');
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                
-                // Gambar kerangka tangan supaya kita tahu AI-nya jalan atau nggak
-                drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 5});
-                
-                // Logika deteksi Peace
-                const isPeace = landmarks[8].y < landmarks[6].y && landmarks[12].y < landmarks[10].y;
-                if (isPeace) video.classList.add('blur');
+                const l = results.multiHandLandmarks[0];
+                if (l[8].y < l[6].y && l[12].y < l[10].y) video.classList.add('blur');
                 else video.classList.remove('blur');
             } else {
                 video.classList.remove('blur');
             }
         });
 
-        async function start() {
+        // Tombol Start
+        startBtn.onclick = async () => {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             video.srcObject = stream;
+            video.play();
+            audio.play();
+            
+            startBtn.style.display = 'none';
+            resetBtn.style.display = 'block';
+            
             async function frame() {
                 await hands.send({image: video});
                 requestAnimationFrame(frame);
             }
             frame();
-        }
-        start();
+        };
+
+        // Tombol Reset
+        resetBtn.onclick = () => {
+            audio.currentTime = 0;
+            audio.play();
+        };
     </script>
 </body>
 </html>
