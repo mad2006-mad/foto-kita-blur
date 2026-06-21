@@ -4,70 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Aesthetic Live Blur</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; }
         canvas { display: block; width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
-        #status { position: absolute; top: 10px; color: #fff; z-index: 10; }
     </style>
 </head>
 <body>
-    <div id="status">Loading AI...</div>
-    <video class="input_video" playsinline style="display:none;"></video>
-    <canvas class="output_canvas"></canvas>
+    <video id="video" playsinline style="display:none;"></video>
+    <canvas id="canvas"></canvas>
 
     <script>
-        const videoElement = document.querySelector('.input_video');
-        const canvasElement = document.querySelector('.output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const status = document.getElementById('status');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let isBlur = false;
 
-        let hands;
-
-        async function init() {
-            // 1. Setup Hands
-            hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-            hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
-            hands.onResults(onResults);
-
-            // 2. Setup Kamera
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            videoElement.srcObject = stream;
-            videoElement.play();
-
-            status.innerText = "Kamera Aktif";
-            
-            // 3. Loop AI
-            async function loop() {
-                if (videoElement.readyState >= 2) {
-                    await hands.send({image: videoElement});
-                }
-                requestAnimationFrame(loop);
-            }
-            loop();
-        }
-
-        function onResults(results) {
-            status.style.display = "none";
-            canvasElement.width = window.innerWidth;
-            canvasElement.height = window.innerHeight;
-            
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-
+        // Setup AI
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+        
+        hands.onResults((results) => {
+            isBlur = false;
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                if (landmarks[8].y < landmarks[6].y && landmarks[12].y < landmarks[10].y) {
-                    canvasCtx.globalAlpha = 0.3;
-                    canvasCtx.drawImage(results.image, 15, 15, canvasElement.width, canvasElement.height);
-                    canvasCtx.drawImage(results.image, -15, -15, canvasElement.width, canvasElement.height);
-                    canvasCtx.globalAlpha = 1.0;
-                }
+                const l = results.multiHandLandmarks[0];
+                if (l[8].y < l[6].y && l[12].y < l[10].y) isBlur = true;
             }
-        }
+        });
 
-        // Tunggu semua script siap
-        window.onload = init;
+        async function start() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = stream;
+            video.play();
+            
+            // Loop utama untuk menggambar
+            function render() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                
+                // Gambar video ke canvas
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Efek Blur
+                if (isBlur) {
+                    ctx.globalAlpha = 0.4;
+                    ctx.drawImage(video, 20, 20, canvas.width, canvas.height);
+                    ctx.drawImage(video, -20, -20, canvas.width, canvas.height);
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                // Kirim frame ke AI
+                hands.send({image: video});
+                requestAnimationFrame(render);
+            }
+            render();
+        }
+        start();
     </script>
 </body>
 </html>
