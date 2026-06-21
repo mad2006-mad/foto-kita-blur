@@ -3,124 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Aesthetic TikTok Cam</title>
+    <title>Aesthetic Live Blur</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
-        body {
-            background-color: #121212;
-            color: white;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0;
-            padding: 10px;
-            overflow: hidden; /* Biar ga bisa di-scroll */
-        }
-        h2 { margin-top: 10px; font-size: 20px; }
-        .info { margin-bottom: 15px; text-align: center; font-size: 14px; }
-        
-        /* Penyesuaian Canvas agar pas di layar HP */
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        /* CSS ini kunci biar kamera nggak gepeng */
         canvas {
-            width: 100%;
-            max-width: 400px; /* Batas maksimal biar di PC ga kebesaran */
-            border-radius: 15px;
-            box-shadow: 0 0 20px rgba(0, 255, 200, 0.2);
-            background-color: black;
-            object-fit: cover;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover; 
+            transform: scaleX(-1); /* Efek cermin supaya natural */
         }
     </style>
 </head>
 <body>
 
-    <h2>✨ Aesthetic Blur Cam ✨</h2>
-    <div class="info">Pose <b>2 Jari (Peace) ✌️</b> untuk jepret!</div>
-
     <video class="input_video" playsinline style="display:none;"></video>
-    <canvas class="output_canvas" width="480" height="640"></canvas>
+    <canvas class="output_canvas"></canvas>
 
     <script>
         const videoElement = document.querySelector('.input_video');
         const canvasElement = document.querySelector('.output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
 
-        let isBlurred = false;
-        let blurEndTime = 0;
-        let savedImageData = null;
-
         function onResults(results) {
-            canvasCtx.save();
+            // Update ukuran canvas menyesuaikan layar HP setiap frame
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
+
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             
-            // Efek Cermin
-            canvasCtx.translate(canvasElement.width, 0);
-            canvasCtx.scale(-1, 1);
+            // Cek apakah pose 2 jari aktif
+            let isPeace = false;
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const indexUp = landmarks[8].y < landmarks[6].y;
+                const middleUp = landmarks[12].y < landmarks[10].y;
+                const ringDown = landmarks[16].y > landmarks[14].y;
+                const pinkyDown = landmarks[20].y > landmarks[18].y;
+                if (indexUp && middleUp && ringDown && pinkyDown) isPeace = true;
+            }
+
+            // Gambar video utama
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-            // Deteksi Pose 2 Jari
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                for (const landmarks of results.multiHandLandmarks) {
-                    const indexUp = landmarks[8].y < landmarks[6].y;
-                    const middleUp = landmarks[12].y < landmarks[10].y;
-                    const ringDown = landmarks[16].y > landmarks[14].y;
-                    const pinkyDown = landmarks[20].y > landmarks[18].y;
-
-                    if (indexUp && middleUp && ringDown && pinkyDown) {
-                        isBlurred = true;
-                        blurEndTime = Date.now() + 3000; // Aktifkan mode blur 3 detik
-                    }
-                }
+            // Jika pose 2 jari terdeteksi, timpa dengan efek blur (ghosting)
+            if (isPeace) {
+                canvasCtx.globalAlpha = 0.4; 
+                canvasCtx.drawImage(results.image, 15, 15, canvasElement.width, canvasElement.height);
+                canvasCtx.drawImage(results.image, -15, -15, canvasElement.width, canvasElement.height);
+                canvasCtx.globalAlpha = 1.0; 
             }
-
-            // --- BAGIAN INI YANG DIUBAH ---
-            if (isBlurred) {
-                if (Date.now() > blurEndTime) {
-                    isBlurred = false;
-                } else {
-                    // Terus gambar frame tambahan dengan posisi geser (Motion Blur Live)
-                    // Kita pakai globalAlpha biar transparan dan menyatu
-                    canvasCtx.globalAlpha = 0.3; 
-                    canvasCtx.drawImage(results.image, 10, 10, canvasElement.width, canvasElement.height);
-                    canvasCtx.drawImage(results.image, -10, -10, canvasElement.width, canvasElement.height);
-                    canvasCtx.globalAlpha = 1.0; // Reset ke normal
-                    
-                    // Tambahkan teks indikator
-                    canvasCtx.fillStyle = "#FF00AA";
-                    canvasCtx.font = "20px Arial";
-                    canvasCtx.fillText("✨ BLUR MODE ON", 20, 40);
-                }
-            }
-            canvasCtx.restore();
         }
 
-        const hands = new Hands({locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-        }});
-        hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
-        });
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
         hands.onResults(onResults);
 
-        // Menyalakan Kamera (Di HP akan memprioritaskan kamera depan)
-        navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "user", width: 480, height: 640 }
-        }).then((stream) => {
+        // Meminta izin kamera depan
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then((stream) => {
             videoElement.srcObject = stream;
             videoElement.play();
             
-            // Kirim frame ke MediaPipe terus-menerus
-            async function processVideo() {
-                await hands.send({image: videoElement});
+            function processVideo() {
+                hands.send({image: videoElement});
                 requestAnimationFrame(processVideo);
             }
             processVideo();
-        }).catch((err) => {
-            alert("Akses kamera ditolak atau tidak tersedia!");
-        });
+        }).catch((err) => alert("Kamera tidak ditemukan!"));
     </script>
 </body>
 </html>
