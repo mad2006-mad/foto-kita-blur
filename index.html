@@ -3,34 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aesthetic Cam with Music</title>
+    <title>Aesthetic Cam</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         video { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
         .blur { filter: blur(15px) brightness(1.2) contrast(1.5); }
-        
-        /* Gaya Tombol */
-        .btn { position: absolute; padding: 15px 30px; background: white; border-radius: 30px; border: none; font-weight: bold; cursor: pointer; z-index: 20; }
-        #btn-reset { bottom: 20px; right: 20px; background: rgba(255,255,255,0.3); color: white; }
+        .btn { position: absolute; padding: 20px 40px; font-size: 20px; z-index: 100; cursor: pointer; }
+        #status { position: absolute; top: 10px; color: white; z-index: 99; }
     </style>
 </head>
 <body>
-
-    <button id="btn-start" class="btn">Mulai Kamera & Musik ✨</button>
-    <button id="btn-reset" class="btn" style="display:none;">Reset Lagu ↺</button>
-    
-    <audio id="myAudio" loop>
-        <source src="lagu.mp3" type="audio/mpeg">
-    </audio>
-
+    <div id="status">Klik tombol untuk mulai...</div>
+    <button id="btn" class="btn">MULAI ✨</button>
+    <audio id="audio" src="lagu.mp3" loop></audio>
     <video id="video" playsinline></video>
 
     <script>
         const video = document.getElementById('video');
-        const audio = document.getElementById('myAudio');
-        const startBtn = document.getElementById('btn-start');
-        const resetBtn = document.getElementById('btn-reset');
+        const audio = document.getElementById('audio');
+        const status = document.getElementById('status');
+        const btn = document.getElementById('btn');
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
@@ -38,34 +31,36 @@
         hands.onResults((results) => {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const l = results.multiHandLandmarks[0];
-                if (l[8].y < l[6].y && l[12].y < l[10].y) video.classList.add('blur');
-                else video.classList.remove('blur');
-            } else {
-                video.classList.remove('blur');
+                if (l[8].y < l[6].y && l[12].y < l[10].y) {
+                    video.classList.add('blur');
+                    status.innerText = "Pose Terdeteksi: BLUR ON";
+                } else {
+                    video.classList.remove('blur');
+                    status.innerText = "Pose Lepas: BLUR OFF";
+                }
             }
         });
 
-        // Tombol Start
-        startBtn.onclick = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            video.srcObject = stream;
-            video.play();
-            audio.play();
-            
-            startBtn.style.display = 'none';
-            resetBtn.style.display = 'block';
-            
-            async function frame() {
-                await hands.send({image: video});
-                requestAnimationFrame(frame);
+        btn.onclick = async () => {
+            try {
+                // Paksa audio load dan play
+                await audio.load();
+                await audio.play();
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.play();
+                
+                btn.style.display = 'none';
+                
+                async function frame() {
+                    await hands.send({image: video});
+                    requestAnimationFrame(frame);
+                }
+                frame();
+            } catch (e) {
+                status.innerText = "Error: " + e.message;
             }
-            frame();
-        };
-
-        // Tombol Reset
-        resetBtn.onclick = () => {
-            audio.currentTime = 0;
-            audio.play();
         };
     </script>
 </body>
