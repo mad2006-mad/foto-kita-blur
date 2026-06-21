@@ -28,27 +28,29 @@
         const video = document.getElementById('video');
         
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+        // Kita turunkan minDetectionConfidence biar AI lebih "gampang" lihat tangan
+        hands.setOptions({ 
+            maxNumHands: 1, 
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5, 
+            minTrackingConfidence: 0.5 
+        });
         
         hands.onResults((results) => {
-            // DEBUG: Cek di console browser HP kalau kamu buka lewat remote debug
-            // console.log(results.multiHandLandmarks); 
-
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                // Tangan terdeteksi!
                 const l = results.multiHandLandmarks[0];
                 
-                // Mari kita buat logika deteksinya lebih "longgar" 
-                // Biar lebih mudah terdeteksi di HP
-                const indexUp = l[8].y < l[6].y;
-                const middleUp = l[12].y < l[10].y;
+                // Logika: Telunjuk (8) lebih atas dari sendi (6) DAN Tengah (12) lebih atas dari sendi (10)
+                const isPeace = (l[8].y < l[6].y && l[12].y < l[10].y);
                 
-                if (indexUp && middleUp) {
+                if (isPeace) {
                     video.classList.add('blur-active');
+                    console.log("Peace terdeteksi!"); // Cek di console browser
                 } else {
                     video.classList.remove('blur-active');
                 }
             } else {
-                // Jika tidak ada tangan, pastikan blur mati
                 video.classList.remove('blur-active');
             }
         });
