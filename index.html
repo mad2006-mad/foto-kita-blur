@@ -2,63 +2,59 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Aesthetic Live Blur</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aesthetic Blur</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; }
-        canvas { display: block; width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
+        /* Video langsung ditampilkan */
+        #video {
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        /* Efek blur estetik pakai CSS (sangat ringan) */
+        .blur-active {
+            filter: blur(10px) brightness(1.2) contrast(1.5);
+        }
     </style>
 </head>
 <body>
-    <video id="video" playsinline style="display:none;"></video>
-    <canvas id="canvas"></canvas>
+
+    <video id="video" playsinline autoplay></video>
 
     <script>
         const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
         
-        let isBlur = false;
-
-        // Setup AI
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
         
         hands.onResults((results) => {
-            isBlur = false;
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const l = results.multiHandLandmarks[0];
-                if (l[8].y < l[6].y && l[12].y < l[10].y) isBlur = true;
+                // Deteksi 2 jari
+                if (l[8].y < l[6].y && l[12].y < l[10].y) {
+                    video.classList.add('blur-active');
+                } else {
+                    video.classList.remove('blur-active');
+                }
+            } else {
+                video.classList.remove('blur-active');
             }
         });
 
         async function start() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            video.srcObject = stream;
-            video.play();
-            
-            // Loop utama untuk menggambar
-            function render() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
                 
-                // Gambar video ke canvas
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Efek Blur
-                if (isBlur) {
-                    ctx.globalAlpha = 0.4;
-                    ctx.drawImage(video, 20, 20, canvas.width, canvas.height);
-                    ctx.drawImage(video, -20, -20, canvas.width, canvas.height);
-                    ctx.globalAlpha = 1.0;
+                async function frame() {
+                    await hands.send({image: video});
+                    requestAnimationFrame(frame);
                 }
-                
-                // Kirim frame ke AI
-                hands.send({image: video});
-                requestAnimationFrame(render);
-            }
-            render();
+                frame();
+            } catch (e) { alert("Izin kamera gagal!"); }
         }
         start();
     </script>
