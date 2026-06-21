@@ -8,17 +8,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        /* CSS ini biar nggak gepeng */
         canvas {
             width: 100vw;
             height: 100vh;
-            object-fit: cover; /* Ini kunci biar gak gepeng */
+            object-fit: cover;
             transform: scaleX(-1); /* Efek cermin */
         }
     </style>
 </head>
 <body>
-    <video class="input_video" playsinline style="display:none;"></video>
+    <video class="input_video" playsinline autoplay muted style="display:none;"></video>
     <canvas class="output_canvas"></canvas>
 
     <script>
@@ -26,32 +25,32 @@
         const canvasElement = document.querySelector('.output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
 
+        // PENTING: Set ukuran canvas SEKALI SAJA di awal
+        function setupCanvas() {
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
+        }
+        window.addEventListener('resize', setupCanvas);
+        setupCanvas();
+
         function onResults(results) {
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             
-            // Set ukuran canvas dinamis biar pas layar HP
-            canvasElement.width = window.innerWidth;
-            canvasElement.height = window.innerHeight;
-
-            let isPeace = false;
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                const indexUp = landmarks[8].y < landmarks[6].y;
-                const middleUp = landmarks[12].y < landmarks[10].y;
-                const ringDown = landmarks[16].y > landmarks[14].y;
-                const pinkyDown = landmarks[20].y > landmarks[18].y;
-                if (indexUp && middleUp && ringDown && pinkyDown) isPeace = true;
-            }
-
-            // Gambar dasar
+            // Gambar frame kamera
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-            // Logika Blur Live
-            if (isPeace) {
-                canvasCtx.globalAlpha = 0.4; 
-                canvasCtx.drawImage(results.image, 15, 15, canvasElement.width, canvasElement.height);
-                canvasCtx.drawImage(results.image, -15, -15, canvasElement.width, canvasElement.height);
-                canvasCtx.globalAlpha = 1.0; 
+            // Deteksi Peace
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const l = results.multiHandLandmarks[0];
+                const isPeace = (l[8].y < l[6].y && l[12].y < l[10].y && l[16].y > l[14].y && l[20].y > l[18].y);
+                
+                if (isPeace) {
+                    // Efek Ghosting/Blur
+                    canvasCtx.globalAlpha = 0.4; 
+                    canvasCtx.drawImage(results.image, 20, 20, canvasElement.width, canvasElement.height);
+                    canvasCtx.drawImage(results.image, -20, -20, canvasElement.width, canvasElement.height);
+                    canvasCtx.globalAlpha = 1.0; 
+                }
             }
         }
 
@@ -68,7 +67,8 @@
                 requestAnimationFrame(frame);
             }
             frame();
-        });
+        })
+        .catch(err => alert("Kamera tidak bisa diakses: " + err));
     </script>
 </body>
 </html>
