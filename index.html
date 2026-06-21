@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aesthetic TikTok Cam</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 10px;
+            overflow: hidden; /* Biar ga bisa di-scroll */
+        }
+        h2 { margin-top: 10px; font-size: 20px; }
+        .info { margin-bottom: 15px; text-align: center; font-size: 14px; }
+        
+        /* Penyesuaian Canvas agar pas di layar HP */
+        canvas {
+            width: 100%;
+            max-width: 400px; /* Batas maksimal biar di PC ga kebesaran */
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 255, 200, 0.2);
+            background-color: black;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>✨ Aesthetic Blur Cam ✨</h2>
+    <div class="info">Pose <b>2 Jari (Peace) ✌️</b> untuk jepret!</div>
+
+    <video class="input_video" playsinline style="display:none;"></video>
+    <canvas class="output_canvas" width="480" height="640"></canvas>
+
+    <script>
+        const videoElement = document.querySelector('.input_video');
+        const canvasElement = document.querySelector('.output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+
+        let isBlurred = false;
+        let blurEndTime = 0;
+        let savedImageData = null;
+
+        function onResults(results) {
+            if (isBlurred) {
+                if (Date.now() > blurEndTime) {
+                    isBlurred = false; 
+                } else {
+                    canvasCtx.putImageData(savedImageData, 0, 0);
+                    canvasCtx.fillStyle = "#00FFC8";
+                    canvasCtx.font = "bold 24px Arial";
+                    canvasCtx.fillText("📸 Captured!", 20, 50);
+                    return; 
+                }
+            }
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            // Efek Cermin (Mirroring)
+            canvasCtx.translate(canvasElement.width, 0);
+            canvasCtx.scale(-1, 1);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    const indexUp = landmarks[8].y < landmarks[6].y;
+                    const middleUp = landmarks[12].y < landmarks[10].y;
+                    const ringDown = landmarks[16].y > landmarks[14].y;
+                    const pinkyDown = landmarks[20].y > landmarks[18].y;
+
+                    if (indexUp && middleUp && ringDown && pinkyDown) {
+                        isBlurred = true;
+                        blurEndTime = Date.now() + 3000; 
+
+                        // Efek Motion Blur Diagonal
+                        canvasCtx.globalAlpha = 0.2; 
+                        canvasCtx.drawImage(results.image, 15, 20, canvasElement.width, canvasElement.height);
+                        canvasCtx.drawImage(results.image, -15, -20, canvasElement.width, canvasElement.height);
+                        canvasCtx.drawImage(results.image, 30, 40, canvasElement.width, canvasElement.height);
+                        canvasCtx.globalAlpha = 1.0; 
+
+                        canvasCtx.restore(); 
+                        savedImageData = canvasCtx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                        return; 
+                    }
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+        hands.onResults(onResults);
+
+        // Menyalakan Kamera (Di HP akan memprioritaskan kamera depan)
+        navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user", width: 480, height: 640 }
+        }).then((stream) => {
+            videoElement.srcObject = stream;
+            videoElement.play();
+            
+            // Kirim frame ke MediaPipe terus-menerus
+            async function processVideo() {
+                await hands.send({image: videoElement});
+                requestAnimationFrame(processVideo);
+            }
+            processVideo();
+        }).catch((err) => {
+            alert("Akses kamera ditolak atau tidak tersedia!");
+        });
+    </script>
+</body>
+</html>
