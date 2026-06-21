@@ -50,26 +50,15 @@
         let savedImageData = null;
 
         function onResults(results) {
-            if (isBlurred) {
-                if (Date.now() > blurEndTime) {
-                    isBlurred = false; 
-                } else {
-                    canvasCtx.putImageData(savedImageData, 0, 0);
-                    canvasCtx.fillStyle = "#00FFC8";
-                    canvasCtx.font = "bold 24px Arial";
-                    canvasCtx.fillText("📸 Captured!", 20, 50);
-                    return; 
-                }
-            }
-
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             
-            // Efek Cermin (Mirroring)
+            // Efek Cermin
             canvasCtx.translate(canvasElement.width, 0);
             canvasCtx.scale(-1, 1);
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
+            // Deteksi Pose 2 Jari
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 for (const landmarks of results.multiHandLandmarks) {
                     const indexUp = landmarks[8].y < landmarks[6].y;
@@ -79,19 +68,27 @@
 
                     if (indexUp && middleUp && ringDown && pinkyDown) {
                         isBlurred = true;
-                        blurEndTime = Date.now() + 3000; 
-
-                        // Efek Motion Blur Diagonal
-                        canvasCtx.globalAlpha = 0.2; 
-                        canvasCtx.drawImage(results.image, 15, 20, canvasElement.width, canvasElement.height);
-                        canvasCtx.drawImage(results.image, -15, -20, canvasElement.width, canvasElement.height);
-                        canvasCtx.drawImage(results.image, 30, 40, canvasElement.width, canvasElement.height);
-                        canvasCtx.globalAlpha = 1.0; 
-
-                        canvasCtx.restore(); 
-                        savedImageData = canvasCtx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                        return; 
+                        blurEndTime = Date.now() + 3000; // Aktifkan mode blur 3 detik
                     }
+                }
+            }
+
+            // --- BAGIAN INI YANG DIUBAH ---
+            if (isBlurred) {
+                if (Date.now() > blurEndTime) {
+                    isBlurred = false;
+                } else {
+                    // Terus gambar frame tambahan dengan posisi geser (Motion Blur Live)
+                    // Kita pakai globalAlpha biar transparan dan menyatu
+                    canvasCtx.globalAlpha = 0.3; 
+                    canvasCtx.drawImage(results.image, 10, 10, canvasElement.width, canvasElement.height);
+                    canvasCtx.drawImage(results.image, -10, -10, canvasElement.width, canvasElement.height);
+                    canvasCtx.globalAlpha = 1.0; // Reset ke normal
+                    
+                    // Tambahkan teks indikator
+                    canvasCtx.fillStyle = "#FF00AA";
+                    canvasCtx.font = "20px Arial";
+                    canvasCtx.fillText("✨ BLUR MODE ON", 20, 40);
                 }
             }
             canvasCtx.restore();
