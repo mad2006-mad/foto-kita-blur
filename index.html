@@ -31,15 +31,24 @@
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
         
         hands.onResults((results) => {
+            // DEBUG: Cek di console browser HP kalau kamu buka lewat remote debug
+            // console.log(results.multiHandLandmarks); 
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const l = results.multiHandLandmarks[0];
-                // Deteksi 2 jari
-                if (l[8].y < l[6].y && l[12].y < l[10].y) {
+                
+                // Mari kita buat logika deteksinya lebih "longgar" 
+                // Biar lebih mudah terdeteksi di HP
+                const indexUp = l[8].y < l[6].y;
+                const middleUp = l[12].y < l[10].y;
+                
+                if (indexUp && middleUp) {
                     video.classList.add('blur-active');
                 } else {
                     video.classList.remove('blur-active');
                 }
             } else {
+                // Jika tidak ada tangan, pastikan blur mati
                 video.classList.remove('blur-active');
             }
         });
