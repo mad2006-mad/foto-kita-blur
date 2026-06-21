@@ -3,12 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aesthetic Cam Final</title>
+    <title>Aesthetic Cam</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; }
-        video { display: none; } /* Video disembunyikan */
-        canvas { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
+        
+        /* Video wajib ditampilkan agar tidak hitam */
+        #video { 
+            position: fixed; width: 100vw; height: 100vh; 
+            object-fit: cover; transform: scaleX(-1);
+        }
+        
+        /* Layer untuk efek blur */
+        #blur-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            backdrop-filter: blur(20px) brightness(1.2) contrast(1.5);
+            -webkit-backdrop-filter: blur(20px) brightness(1.2) contrast(1.5);
+            opacity: 0; transition: opacity 0.5s ease;
+            pointer-events: none; /* Supaya klik tetap bisa ke video/tombol */
+        }
+        
+        .show-blur { opacity: 1 !important; }
         
         #overlay { position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000; }
         .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; }
@@ -20,54 +35,42 @@
     <div id="overlay"><button id="btn-start" class="btn">MULAI ✨</button></div>
     <button id="btn-reset">Reset Audio ↺</button>
     <audio id="audio" src="lagu.mp3" loop></audio>
-    <video id="video" playsinline></video>
-    <canvas id="canvas"></canvas>
+    
+    <video id="video" playsinline autoplay></video>
+    <div id="blur-overlay"></div>
 
     <script>
         const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const audio = document.getElementById('audio');
-        let isBlur = false;
-
+        const blurOverlay = document.getElementById('blur-overlay');
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
-            isBlur = false;
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const l = results.multiHandLandmarks[0];
-                if (l[8].y < l[6].y && l[12].y < l[10].y) isBlur = true;
+                if (l[8].y < l[6].y && l[12].y < l[10].y) blurOverlay.classList.add('show-blur');
+                else blurOverlay.classList.remove('show-blur');
+            } else {
+                blurOverlay.classList.remove('show-blur');
             }
         });
-
-        async function render() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            
-            // Terapkan blur secara manual jika isBlur true
-            if (isBlur) {
-                ctx.filter = 'blur(15px) brightness(1.2) contrast(1.5)';
-            } else {
-                ctx.filter = 'none';
-            }
-            
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            await hands.send({image: video});
-            requestAnimationFrame(render);
-        }
 
         document.getElementById('btn-start').onclick = async () => {
             document.getElementById('overlay').remove();
             document.getElementById('btn-reset').style.display = 'block';
-            audio.play();
+            document.getElementById('audio').play();
+            
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             video.srcObject = stream;
-            video.play();
-            render();
+            
+            async function frame() {
+                await hands.send({image: video});
+                requestAnimationFrame(frame);
+            }
+            frame();
         };
 
-        document.getElementById('btn-reset').onclick = () => { audio.currentTime = 0; audio.play(); };
+        document.getElementById('btn-reset').onclick = () => { document.getElementById('audio').currentTime = 0; document.getElementById('audio').play(); };
     </script>
 </body>
 </html>
