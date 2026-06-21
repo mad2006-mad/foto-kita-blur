@@ -6,20 +6,30 @@
     <title>Aesthetic Cam</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
-        video { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
-        .blur { filter: blur(15px) brightness(1.2) contrast(1.5); }
-        .btn { position: absolute; padding: 20px 40px; font-size: 20px; z-index: 100; cursor: pointer; }
-        #status { position: absolute; top: 10px; color: white; z-index: 99; }
-    </style>
+    body { margin: 0; background: #000; overflow: hidden; }
+    /* Bungkus video dalam container */
+    #container { width: 100vw; height: 100vh; transition: 0.3s; }
+    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    
+    /* Efek blur diberikan ke CONTAINER, bukan ke VIDEO */
+    .blur-mode {
+        filter: blur(15px) brightness(1.2) contrast(1.5);
+    }
+    
+    .btn { position: absolute; padding: 20px 40px; font-size: 20px; z-index: 100; cursor: pointer; }
+    #status { position: absolute; top: 10px; color: white; z-index: 99; }
+</style>
 </head>
 <body>
     <div id="status">Klik tombol untuk mulai...</div>
     <button id="btn" class="btn">MULAI ✨</button>
     <audio id="audio" src="lagu.mp3" loop></audio>
-    <video id="video" playsinline></video>
-
+    
+    <div id="container">
+        <video id="video" playsinline></video>
+    </div>
     <script>
+        const container = document.getElementById('container');
         const video = document.getElementById('video');
         const audio = document.getElementById('audio');
         const status = document.getElementById('status');
@@ -32,12 +42,14 @@
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const l = results.multiHandLandmarks[0];
                 if (l[8].y < l[6].y && l[12].y < l[10].y) {
-                    video.classList.add('blur');
+                    container.classList.add('blur-mode'); // Tambah ke container
                     status.innerText = "Pose Terdeteksi: BLUR ON";
                 } else {
-                    video.classList.remove('blur');
+                    container.classList.remove('blur-mode');
                     status.innerText = "Pose Lepas: BLUR OFF";
                 }
+            } else {
+                container.classList.remove('blur-mode');
             }
         });
 
