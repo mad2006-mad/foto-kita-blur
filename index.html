@@ -2,44 +2,77 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Debug Camera</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aesthetic Live Blur</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
-        body { margin: 0; background: #111; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        #log { position: absolute; top: 10px; left: 10px; color: yellow; font-size: 12px; }
-        canvas { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
+        body { margin: 0; background: #000; overflow: hidden; }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            transform: scaleX(-1); /* Efek cermin */
+        }
     </style>
 </head>
 <body>
-    <div id="log">Loading...</div>
-    <video id="v" style="display:none;"></video>
-    <canvas id="c"></canvas>
+
+    <video class="input_video" playsinline style="display:none;"></video>
+    <canvas class="output_canvas"></canvas>
 
     <script>
-        const log = document.getElementById('log');
-        const v = document.getElementById('v');
-        const c = document.getElementById('c');
-        const ctx = c.getContext('2d');
+        const videoElement = document.querySelector('.input_video');
+        const canvasElement = document.querySelector('.output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
 
-        async function init() {
-            try {
-                log.innerText = "Requesting camera...";
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                v.srcObject = stream;
-                v.play();
-                log.innerText = "Camera active. Drawing...";
-                
-                function draw() {
-                    c.width = window.innerWidth;
-                    c.height = window.innerHeight;
-                    ctx.drawImage(v, 0, 0, c.width, c.height);
-                    requestAnimationFrame(draw);
+        function onResults(results) {
+            canvasElement.width = window.innerWidth;
+            canvasElement.height = window.innerHeight;
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const indexUp = landmarks[8].y < landmarks[6].y;
+                const middleUp = landmarks[12].y < landmarks[10].y;
+                const ringDown = landmarks[16].y > landmarks[14].y;
+                const pinkyDown = landmarks[20].y > landmarks[18].y;
+
+                if (indexUp && middleUp && ringDown && pinkyDown) {
+                    canvasCtx.globalAlpha = 0.3; 
+                    canvasCtx.drawImage(results.image, 15, 15, canvasElement.width, canvasElement.height);
+                    canvasCtx.drawImage(results.image, -15, -15, canvasElement.width, canvasElement.height);
+                    canvasCtx.globalAlpha = 1.0;
                 }
-                draw();
-            } catch (e) {
-                log.innerText = "Error: " + e.message;
             }
         }
-        init();
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+        hands.onResults(onResults);
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                videoElement.srcObject = stream;
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    loop();
+                };
+            } catch (e) { alert("Error kamera: " + e.message); }
+        }
+
+        async function loop() {
+            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                await hands.send({image: videoElement});
+            }
+            requestAnimationFrame(loop);
+        }
+
+        startCamera();
     </script>
 </body>
 </html>
