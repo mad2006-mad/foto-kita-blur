@@ -3,69 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aesthetic Blur</title>
+    <title>Aesthetic Blur Debug</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; }
-        /* Video langsung ditampilkan */
-        #video {
-            width: 100vw;
-            height: 100vh;
-            object-fit: cover;
-            transform: scaleX(-1);
-        }
-        /* Efek blur estetik pakai CSS (sangat ringan) */
-        .blur-active {
-            filter: blur(10px) brightness(1.2) contrast(1.5);
-        }
+        #canvas-overlay { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; transform: scaleX(-1); }
+        video { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
+        .blur { filter: blur(15px) brightness(1.2) contrast(1.5); }
     </style>
 </head>
 <body>
-
     <video id="video" playsinline autoplay></video>
+    <canvas id="canvas-overlay"></canvas>
 
     <script>
         const video = document.getElementById('video');
-        
+        const canvas = document.getElementById('canvas-overlay');
+        const ctx = canvas.getContext('2d');
+
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        // Kita turunkan minDetectionConfidence biar AI lebih "gampang" lihat tangan
-        hands.setOptions({ 
-            maxNumHands: 1, 
-            modelComplexity: 1,
-            minDetectionConfidence: 0.5, 
-            minTrackingConfidence: 0.5 
-        });
-        
+        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+
         hands.onResults((results) => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                // Tangan terdeteksi!
-                const l = results.multiHandLandmarks[0];
+                const landmarks = results.multiHandLandmarks[0];
                 
-                // Logika: Telunjuk (8) lebih atas dari sendi (6) DAN Tengah (12) lebih atas dari sendi (10)
-                const isPeace = (l[8].y < l[6].y && l[12].y < l[10].y);
+                // Gambar kerangka tangan supaya kita tahu AI-nya jalan atau nggak
+                drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 5});
                 
-                if (isPeace) {
-                    video.classList.add('blur-active');
-                    console.log("Peace terdeteksi!"); // Cek di console browser
-                } else {
-                    video.classList.remove('blur-active');
-                }
+                // Logika deteksi Peace
+                const isPeace = landmarks[8].y < landmarks[6].y && landmarks[12].y < landmarks[10].y;
+                if (isPeace) video.classList.add('blur');
+                else video.classList.remove('blur');
             } else {
-                video.classList.remove('blur-active');
+                video.classList.remove('blur');
             }
         });
 
         async function start() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                video.srcObject = stream;
-                
-                async function frame() {
-                    await hands.send({image: video});
-                    requestAnimationFrame(frame);
-                }
-                frame();
-            } catch (e) { alert("Izin kamera gagal!"); }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = stream;
+            async function frame() {
+                await hands.send({image: video});
+                requestAnimationFrame(frame);
+            }
+            frame();
         }
         start();
     </script>
