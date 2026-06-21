@@ -1,0 +1,2 @@
+# foto-kita-blur
+bjbsjkbsb
