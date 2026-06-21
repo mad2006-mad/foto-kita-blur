@@ -3,103 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aesthetic Cam</title>
+    <title>Aesthetic Cam Final</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; background: #000; overflow: hidden; }
+        video { display: none; } /* Video disembunyikan */
+        canvas { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
         
-        #container { position: relative; width: 100vw; height: 100vh; }
-        
-        #video { 
-            width: 100%; height: 100%; object-fit: cover; 
-            transform: scaleX(-1); position: absolute; top: 0; left: 0;
-        }
-        
-        /* Layer blur yang menumpuk di atas video */
-        #blur-layer {
-            position: absolute; width: 100%; height: 100%; z-index: 2;
-            backdrop-filter: blur(20px) brightness(1.1) saturate(1.5);
-            -webkit-backdrop-filter: blur(20px) brightness(1.1) saturate(1.5); /* Support Safari */
-            opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
-        }
-        
-        .active { opacity: 1 !important; }
-        
-        /* UI Styling */
-        #overlay { 
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-            background: rgba(0,0,0,0.85); z-index: 1000;
-            display: flex; justify-content: center; align-items: center; 
-        }
-        .btn { 
-            padding: 20px 40px; font-size: 20px; cursor: pointer; 
-            border-radius: 30px; border: none; background: white; font-weight: bold;
-        }
-        #btn-reset { 
-            position: fixed; bottom: 20px; right: 20px; z-index: 999; 
-            padding: 12px 24px; background: rgba(255,255,255,0.2); 
-            color: white; border: 1px solid white; border-radius: 20px;
-            backdrop-filter: blur(5px); cursor: pointer; display: none;
-        }
+        #overlay { position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; }
+        #btn-reset { position: fixed; bottom: 20px; right: 20px; z-index: 999; padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 20px; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="overlay">
-        <button id="btn-start" class="btn">MULAI ✨</button>
-    </div>
-    
+    <div id="overlay"><button id="btn-start" class="btn">MULAI ✨</button></div>
     <button id="btn-reset">Reset Audio ↺</button>
     <audio id="audio" src="lagu.mp3" loop></audio>
-    
-    <div id="container">
-        <video id="video" playsinline></video>
-        <div id="blur-layer"></div>
-    </div>
-    
+    <video id="video" playsinline></video>
+    <canvas id="canvas"></canvas>
+
     <script>
         const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
         const audio = document.getElementById('audio');
-        const overlay = document.getElementById('overlay');
-        const resetBtn = document.getElementById('btn-reset');
-        const blurLayer = document.getElementById('blur-layer');
+        let isBlur = false;
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
+            isBlur = false;
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const l = results.multiHandLandmarks[0];
-                // Deteksi 2 jari (Index & Middle)
-                if (l[8].y < l[6].y && l[12].y < l[10].y) {
-                    blurLayer.classList.add('active');
-                } else {
-                    blurLayer.classList.remove('active');
-                }
-            } else {
-                blurLayer.classList.remove('active');
+                if (l[8].y < l[6].y && l[12].y < l[10].y) isBlur = true;
             }
         });
 
+        async function render() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Terapkan blur secara manual jika isBlur true
+            if (isBlur) {
+                ctx.filter = 'blur(15px) brightness(1.2) contrast(1.5)';
+            } else {
+                ctx.filter = 'none';
+            }
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            await hands.send({image: video});
+            requestAnimationFrame(render);
+        }
+
         document.getElementById('btn-start').onclick = async () => {
-            try {
-                overlay.remove();
-                resetBtn.style.display = 'block';
-                audio.play();
-                
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                video.srcObject = stream;
-                video.play();
-                
-                async function frame() {
-                    await hands.send({image: video});
-                    requestAnimationFrame(frame);
-                }
-                frame();
-            } catch (e) { alert("Izin kamera gagal! Pastikan akses kamera diizinkan."); }
+            document.getElementById('overlay').remove();
+            document.getElementById('btn-reset').style.display = 'block';
+            audio.play();
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = stream;
+            video.play();
+            render();
         };
 
-        resetBtn.onclick = () => { audio.currentTime = 0; audio.play(); };
+        document.getElementById('btn-reset').onclick = () => { audio.currentTime = 0; audio.play(); };
     </script>
 </body>
 </html>
