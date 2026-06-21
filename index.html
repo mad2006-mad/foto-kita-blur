@@ -30,10 +30,17 @@
             color: white; border: 1px solid white; border-radius: 20px;
             backdrop-filter: blur(5px); cursor: pointer; display: none;
         }
+
+        #blur-layer { 
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        z-index: 500; pointer-events: none; /* Biar tetap bisa klik tombol */
+        opacity: 0; transition: opacity 0.3s;
+        }
+        .blur-on { opacity: 1 !important; }
     </style>
 </head>
 <body>
-
+    <canvas id="blur-layer"></canvas>
     <div id="overlay">
         <button id="btn-start" class="btn">MULAI ✨</button>
     </div>
@@ -52,20 +59,31 @@
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
+        const blurLayer = document.getElementById('blur-layer');
+        const ctx = blurLayer.getContext('2d');
+
         hands.onResults((results) => {
-            // Deteksi 2 jari
+            // Ukuran canvas harus sesuai layar
+            blurLayer.width = window.innerWidth;
+            blurLayer.height = window.innerHeight;
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const l = results.multiHandLandmarks[0];
                 if (l[8].y < l[6].y && l[12].y < l[10].y) {
-                    video.classList.add('blur-mode');
+                    blurLayer.classList.add('blur-on');
+                    
+                    // Gambar efek blur di canvas
+                    ctx.clearRect(0, 0, blurLayer.width, blurLayer.height);
+                    ctx.filter = 'blur(15px) brightness(1.2) contrast(1.5)';
+                    // Menggambar video ke canvas dengan filter
+                    ctx.drawImage(video, 0, 0, blurLayer.width, blurLayer.height);
                 } else {
-                    video.classList.remove('blur-mode');
+                    blurLayer.classList.remove('blur-on');
                 }
             } else {
-                video.classList.remove('blur-mode');
+                blurLayer.classList.remove('blur-on');
             }
         });
-
         document.getElementById('btn-start').onclick = async () => {
             try {
                 overlay.remove();
