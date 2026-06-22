@@ -35,25 +35,28 @@
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
-            // Sesuaikan ukuran canvas dengan layar
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-
-            let isAesthetic = false;
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const l = results.multiHandLandmarks[0];
-                if (l[8].y < l[6].y && l[12].y < l[10].y) isAesthetic = true;
+            // Pastikan ukuran canvas sesuai layar
+            if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
             }
-
-            // Terapkan efek langsung ke konteks canvas
-            if (isAesthetic) {
-                // Efek Blur + Lighting
-                ctx.filter = 'blur(8px) brightness(1.2) saturate(1.5)';
-            } else {
-                ctx.filter = 'none';
+        
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Cek apakah ada gambar hasil deteksi
+            if (results.image) {
+                let isAesthetic = false;
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const l = results.multiHandLandmarks[0];
+                    if (l[8].y < l[6].y && l[12].y < l[10].y) isAesthetic = true;
+                }
+        
+                // Terapkan filter
+                ctx.filter = isAesthetic ? 'blur(8px) brightness(1.2) saturate(1.5)' : 'none';
+                
+                // Gambar ke canvas
+                ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
             }
-
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
         });
 
         document.getElementById('btn-start').onclick = async () => {
@@ -65,7 +68,9 @@
             video.srcObject = stream;
             
             async function frame() {
-                if (video.readyState >= 2) await hands.send({image: video});
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    await hands.send({image: video});
+                }
                 requestAnimationFrame(frame);
             }
             frame();
