@@ -7,79 +7,74 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; }
-        
-        #video-container {
-            width: 100vw;
-            height: 100vh;
-            transition: filter 0.5s ease;
-            will-change: filter;
-        }
-
-        #video { 
-            width: 100vw; 
-            height: 100vh; 
-            object-fit: cover; 
-            transform: scaleX(-1);
-        }
-        
-        .blur-active { 
-            /* Menggunakan -webkit- agar kompatibel dengan iPhone/Safari dan Android */
-            -webkit-filter: blur(10px) brightness(1.2) saturate(2);
-            filter: blur(10px) brightness(1.2) saturate(2);
-        }
-
+        #video { position: absolute; width: 1px; height: 1px; opacity: 0; }
+        #output { width: 100vw; height: 100vh; object-fit: cover; }
         #overlay { position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; }
         .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; }
         #btn-reset { position: fixed; bottom: 20px; right: 20px; z-index: 999; padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 20px; display: none; }
     </style>
 </head>
 <body>
-
     <div id="overlay"><button id="btn-start" class="btn">MULAI ✨</button></div>
     <button id="btn-reset">Reset Audio ↺</button>
     <audio id="audio" src="lagu.mp3" loop></audio>
-    
-    <div id="video-container">
-        <video id="video" playsinline autoplay muted></video>
-    </div>
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="output"></canvas>
 
     <script>
         const video = document.getElementById('video');
-        const container = document.getElementById('video-container');
+        const canvas = document.getElementById('output');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Optimasi performa
+        const audio = document.getElementById('audio');
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
+        let isPeace = false;
         hands.onResults((results) => {
-            let isPeace = false;
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const l = results.multiHandLandmarks[0];
-                if (l[8].y < l[6].y && l[12].y < l[10].y) isPeace = true;
-            }
-
-            if (isPeace) container.classList.add('blur-active');
-            else container.classList.remove('blur-active');
+            isPeace = (results.multiHandLandmarks && results.multiHandLandmarks.length > 0 && 
+                       results.multiHandLandmarks[0][8].y < results.multiHandLandmarks[0][6].y && 
+                       results.multiHandLandmarks[0][12].y < results.multiHandLandmarks[0][10].y);
         });
 
+        function render() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // Menerapkan blur langsung ke konteks canvas
+            if (isPeace) {
+                ctx.filter = 'blur(12px) brightness(1.2) saturate(2)';
+            } else {
+                ctx.filter = 'none';
+            }
+
+            ctx.save();
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+            
+            requestAnimationFrame(render);
+        }
+
         document.getElementById('btn-start').onclick = async () => {
-            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('overlay').remove();
             document.getElementById('btn-reset').style.display = 'block';
-            document.getElementById('audio').play().catch(e => console.log(e));
+            audio.play();
             
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             video.srcObject = stream;
             
-            async function frame() {
+            // Jalankan deteksi tangan & render terpisah
+            async function detect() {
                 if (video.readyState >= 2) await hands.send({image: video});
-                requestAnimationFrame(frame);
+                requestAnimationFrame(detect);
             }
-            frame();
+            detect();
+            render();
         };
 
-        document.getElementById('btn-reset').onclick = () => { 
-            const audio = document.getElementById('audio');
-            audio.currentTime = 0; 
-            audio.play(); 
-        };
+        document.getElementById('btn-reset').onclick = () => { audio.currentTime = 0; audio.play(); };
     </script>
 </body>
 </html>
