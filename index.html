@@ -3,24 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnosa Kamera</title>
+    <title>Aesthetic Cam</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; }
+        #video { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; }
+        #output { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; }
+        #overlay { position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; }
+        .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; }
+    </style>
 </head>
 <body>
-    <div id="status" style="padding: 20px; background: yellow;">Mencoba akses kamera...</div>
-    <video id="v" playsinline autoplay muted style="width:100%; border:5px solid red;"></video>
+
+    <div id="overlay"><button id="btn-start" class="btn">MULAI ✨</button></div>
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="output"></canvas>
 
     <script>
-        const status = document.getElementById('status');
-        const v = document.getElementById('v');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('output');
+        const ctx = canvas.getContext('2d');
+        
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-        .then(stream => {
-            v.srcObject = stream;
-            status.innerText = "Kamera Berhasil! Jika layar di bawah masih hitam, artinya HP tidak mengizinkan akses ke elemen video.";
-        })
-        .catch(err => {
-            status.innerText = "GAGAL: " + err.message;
+        // Fungsi menggambar yang sangat sederhana
+        function drawFrame(image, isPeace) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Efek Blur & Lighting
+            ctx.filter = isPeace ? 'blur(8px) brightness(1.2) saturate(2)' : 'none';
+            
+            ctx.save();
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        }
+
+        hands.onResults((results) => {
+            let isPeace = false;
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const l = results.multiHandLandmarks[0];
+                if (l[8].y < l[6].y && l[12].y < l[10].y) isPeace = true;
+            }
+            drawFrame(results.image || video, isPeace);
         });
+
+        document.getElementById('btn-start').onclick = async () => {
+            document.getElementById('overlay').style.display = 'none';
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = stream;
+            
+            async function loop() {
+                if (video.readyState >= 2) await hands.send({image: video});
+                requestAnimationFrame(loop);
+            }
+            loop();
+        };
     </script>
 </body>
 </html>
