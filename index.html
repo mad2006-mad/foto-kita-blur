@@ -6,67 +6,62 @@
     <title>Aesthetic Cam</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        /* Canvas harus menutupi layar */
+        body { margin: 0; background: #000; overflow: hidden; }
         canvas { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
-        
-        #overlay { position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; }
+        #overlay { position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; }
+        .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; background: #fff; }
     </style>
 </head>
 <body>
 
     <div id="overlay"><button id="btn-start" class="btn">MULAI ✨</button></div>
-    <video id="video" playsinline style="display:none;"></video>
+    <audio id="audio" src="lagu.mp3" loop></audio>
+    <video id="video" playsinline autoplay muted style="display:none;"></video>
     <canvas id="output"></canvas>
 
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('output');
         const ctx = canvas.getContext('2d');
-        let isAesthetic = false;
+        const audio = document.getElementById('audio');
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
-            // Set ukuran canvas agar pas layar
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-
-            // Logika deteksi tangan
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const l = results.multiHandLandmarks[0];
-                isAesthetic = (l[8].y < l[6].y && l[12].y < l[10].y);
-            } else {
-                isAesthetic = false;
-            }
-
-            // Terapkan Efek
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            if (isAesthetic) {
-                // Efek Aesthetic (Brightness, Saturate, Contrast)
-                ctx.filter = 'brightness(1.5) saturate(2) contrast(1.2)';
-            } else {
-                ctx.filter = 'none';
+            let isAesthetic = false;
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const l = results.multiHandLandmarks[0];
+                if (l[8].y < l[6].y && l[12].y < l[10].y) isAesthetic = true;
             }
 
+            ctx.filter = isAesthetic ? 'brightness(1.5) saturate(2) contrast(1.2)' : 'none';
             ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
         });
 
         document.getElementById('btn-start').onclick = async () => {
-            document.getElementById('overlay').remove();
+            // 1. Jalankan audio dulu
+            audio.play().catch(e => console.log("Audio diblokir"));
             
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            video.srcObject = stream;
-            video.play();
-            
-            async function frame() {
-                await hands.send({image: video});
-                requestAnimationFrame(frame);
+            // 2. Akses Kamera
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
+                document.getElementById('overlay').style.display = 'none';
+                
+                // 3. Loop MediaPipe
+                async function frame() {
+                    if (video.readyState >= 2) await hands.send({image: video});
+                    requestAnimationFrame(frame);
+                }
+                frame();
+            } catch (err) {
+                alert("Kamera tidak bisa dibuka: " + err.message);
             }
-            frame();
         };
     </script>
 </body>
