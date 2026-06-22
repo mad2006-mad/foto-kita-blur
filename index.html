@@ -3,75 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aesthetic Cam</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-    <style>
-        body { margin: 0; background: #000; overflow: hidden; }
-        /* Video disembunyikan total */
-        #video { position: absolute; width: 1px; height: 1px; opacity: 0; }
-        /* Canvas sebagai layar utama */
-        #output { width: 100vw; height: 100vh; object-fit: cover; }
-        
-        #overlay { position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000; color: white; }
-        .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; }
-        #btn-reset { position: fixed; bottom: 20px; right: 20px; z-index: 999; padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 20px; display: none; }
-    </style>
+    <title>Diagnosa Kamera</title>
 </head>
 <body>
-
-    <div id="overlay"><button id="btn-start" class="btn">MULAI ✨</button></div>
-    <button id="btn-reset">Reset Audio ↺</button>
-    <audio id="audio" src="lagu.mp3" loop></audio>
-    <video id="video" playsinline autoplay muted></video>
-    <canvas id="output"></canvas>
+    <div id="status" style="padding: 20px; background: yellow;">Mencoba akses kamera...</div>
+    <video id="v" playsinline autoplay muted style="width:100%; border:5px solid red;"></video>
 
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('output');
-        const ctx = canvas.getContext('2d');
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        
-        hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        const status = document.getElementById('status');
+        const v = document.getElementById('v');
 
-        hands.onResults((results) => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Logika Deteksi
-            let isPeace = false;
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const l = results.multiHandLandmarks[0];
-                if (l[8].y < l[6].y && l[12].y < l[10].y) isPeace = true;
-            }
-
-            // Terapkan filter ke Canvas (Bukan ke Video)
-            ctx.filter = isPeace ? 'blur(8px) brightness(1.3) saturate(2)' : 'none';
-
-            // Mirroring manual di Canvas
-            ctx.save();
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-            ctx.restore();
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then(stream => {
+            v.srcObject = stream;
+            status.innerText = "Kamera Berhasil! Jika layar di bawah masih hitam, artinya HP tidak mengizinkan akses ke elemen video.";
+        })
+        .catch(err => {
+            status.innerText = "GAGAL: " + err.message;
         });
-
-        document.getElementById('btn-start').onclick = async () => {
-            document.getElementById('overlay').remove();
-            document.getElementById('btn-reset').style.display = 'block';
-            document.getElementById('audio').play();
-            
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            video.srcObject = stream;
-            
-            async function frame() {
-                if (video.readyState >= 2) await hands.send({image: video});
-                requestAnimationFrame(frame);
-            }
-            frame();
-        };
-
-        document.getElementById('btn-reset').onclick = () => { document.getElementById('audio').currentTime = 0; document.getElementById('audio').play(); };
     </script>
 </body>
 </html>
