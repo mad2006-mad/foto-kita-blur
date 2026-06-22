@@ -1,84 +1,128 @@
 <!DOCTYPE html>
+
 <html lang="id">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Aesthetic Cam</title>
+
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+
+        body { margin: 0; background: #000; overflow: hidden; }
+
+        #video { width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); transition: 0.5s; }
+
         
-        /* Canvas untuk hasil akhir */
-        #output { width: 100vw; height: 100vh; object-fit: cover; }
+
+        /* Ganti efek blur dengan efek pencahayaan yang dramatis */
+
+        .aesthetic-mode { 
+
+            filter: brightness(1.5) saturate(2) contrast(1.2);
+
+            box-shadow: inset 0 0 100px rgba(255,255,255,0.5);
+
+        }
+
         
-        /* Elemen video untuk sumber (disembunyikan tapi tetap aktif) */
-        #video { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
         #overlay { position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; z-index: 1000; }
+
         .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 30px; border: none; }
-        
-        #btn-reset { position: fixed; bottom: 20px; right: 20px; z-index: 999; padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 20px; }
+
+        #btn-reset { position: fixed; bottom: 20px; right: 20px; z-index: 999; padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 20px; display: none; }
+
     </style>
+
 </head>
+
 <body>
 
+
+
     <div id="overlay"><button id="btn-start" class="btn">MULAI ✨</button></div>
+
     <button id="btn-reset">Reset Audio ↺</button>
+
     <audio id="audio" src="lagu.mp3" loop></audio>
-    <video id="video" playsinline autoplay muted></video>
-    <canvas id="output"></canvas>
+
+    <video id="video" playsinline></video>
+
+
 
     <script>
+
         const video = document.getElementById('video');
-        const canvas = document.getElementById('output');
-        const ctx = canvas.getContext('2d');
-        const audio = document.getElementById('audio');
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+
         hands.setOptions({ maxNumHands: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
+
+
         hands.onResults((results) => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            let isAesthetic = false;
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+
                 const l = results.multiHandLandmarks[0];
-                if (l[8].y < l[6].y && l[12].y < l[10].y) isAesthetic = true;
+
+                if (l[8].y < l[6].y && l[12].y < l[10].y) video.classList.add('aesthetic-mode');
+
+                else video.classList.remove('aesthetic-mode');
+
+            } else {
+
+                video.classList.remove('aesthetic-mode');
+
             }
 
-            ctx.filter = isAesthetic ? 'brightness(1.5) saturate(2) contrast(1.2)' : 'none';
-            
-            // Logika Mirroring: 
-            // Kita tidak memutar seluruh canvas, tapi menggambar secara terbalik
-            ctx.save();
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-            ctx.restore();
         });
 
+
+
         document.getElementById('btn-start').onclick = async () => {
-            audio.play().catch(e => console.log("Audio diblokir"));
-            document.getElementById('overlay').style.display = 'none';
+
+            document.getElementById('overlay').remove();
+
+            document.getElementById('btn-reset').style.display = 'block';
+
+            document.getElementById('audio').play();
+
             
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                video.srcObject = stream;
-                
-                async function frame() {
-                    if (video.readyState >= 2) await hands.send({image: video});
-                    requestAnimationFrame(frame);
-                }
-                frame();
-            } catch (err) { alert("Kamera gagal: " + err.message); }
+
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+
+            video.srcObject = stream;
+
+            video.play();
+
+            
+
+            async function frame() {
+
+                await hands.send({image: video});
+
+                requestAnimationFrame(frame);
+
+            }
+
+            frame();
+
         };
 
-        document.getElementById('btn-reset').onclick = () => { 
-            audio.currentTime = 0; 
-            audio.play(); 
-        };
+
+
+        document.getElementById('btn-reset').onclick = () => { document.getElementById('audio').currentTime = 0; document.getElementById('audio').play(); };
+
     </script>
+
 </body>
-</html>
+
+</html> 
+
